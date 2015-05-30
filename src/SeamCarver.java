@@ -18,7 +18,7 @@ public class SeamCarver {
     int height;
     int[][] pixelMatrix;
     int[][] energyMatrix;
-    double[] distTo;
+    int[] distTo;
     int[] edgeTo;
 
     public SeamCarver(Picture picture) {
@@ -26,33 +26,25 @@ public class SeamCarver {
         picture.setOriginUpperLeft();
         width = picture.width();
         height = picture.height();
-        edgeTo = new int[width * height];
+        edgeTo = new int[width * height + 1];
         Color color;
         pixelMatrix = new int[width][height];
-        energyMatrix = new int[width][height];
 
-        distTo = new double[width * height];
+        distTo = new int[width * height + 1];
 
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
                 color = picture.get(i, j);
                 int rgb = color.getRGB();
                 pixelMatrix[i][j] = color.getRGB();
+                //pixels[i][j] = picture.get(i, j).getRGB();
+
             }
         }
-        for (int col = 0; col < width; col++) {
-            for (int row = 0; row < height; row++) {
-                energyMatrix[col][row] = energy(col, row);
-            }
 
+        for (int k = 0; k < width; k++) {
+            edgeTo[getNum(0, k)] = 0;
         }
-        for (int i = 0; i < height * width; i++) {
-            distTo[i] = Double.POSITIVE_INFINITY;
-        }
-
-        // for (int k = 0; k < width; k++) {
-        //    edgeTo[getNum(k, 0)] = 0;
-        //}
     }
 
     public Picture picture() {
@@ -60,8 +52,8 @@ public class SeamCarver {
         pictureOut = new Picture(width, height);
         Color color;
 
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
+        for (int i = 0; i <= width; i++) {
+            for (int j = 0; j <= height; j++) {
                 color = new Color(pixelMatrix[i][j]);
                 pictureOut.set(i, j, color);
 
@@ -80,7 +72,7 @@ public class SeamCarver {
         return height;
     }
 
-    private int getNum(int col, int row) {
+    private int getNum(int row, int col) {
         return row * width + col;
     }
 
@@ -92,7 +84,7 @@ public class SeamCarver {
         return (i) % width;
     }
 
-    private int deltaSquared(int minus, int plus) {
+    private double deltaSquared(int minus, int plus) {
 
         int rplus = (plus) & 0xFF;
         int gplus = (plus >> 8) & 0xFF;
@@ -108,7 +100,7 @@ public class SeamCarver {
 
     }
 
-    public int energy(int col, int row) {
+    public double energy(int row, int col) {
 
         if (row < 0 || row >= height || col < 0 || col >= width) {
             throw new java.lang.IndexOutOfBoundsException();
@@ -118,50 +110,19 @@ public class SeamCarver {
         }
         //set top to  energy 1
         if (row == 0 && col != 0 && col != width - 1) {
-            return 1;//TODO never reached
+            return 1;
 
         }
-        return deltaSquared(pixelMatrix[col - 1][row], pixelMatrix[col + 1][row])
-                + deltaSquared(pixelMatrix[col][row - 1], pixelMatrix[col][row + 1]);
+        return deltaSquared(pixelMatrix[row - 1][col], pixelMatrix[row + 1][col])
+                + deltaSquared(pixelMatrix[row][col - 1], pixelMatrix[row][col + 1]);
 
     }
 
-    private void relaxOld(int col, int row) {
-        if (row == height - 1) {
-            return;
-        }
-        for (int k = col - 1; k <= col + 1; k++) {
-            if (k < 0 || k >= width) {
-                continue;
-            }
-            if (energyMatrix[k][row + 1] + distTo[getNum(col, row)] < distTo[getNum(k, row + 1)]) {
-                distTo[getNum(k, row + 1)] = energyMatrix[k][row + 1] + distTo[getNum(col, row)];
-                edgeTo[getNum(k, row + 1)] = getNum(col, row);
-            }
-        }
-    }
-
-    private void relax(int col, int row, boolean horizontal) {
-
-        if (horizontal == false) {
-            for (int k = col - 1; k <= col + 1; k++) {
-                if (k < 0 || k >= width) {
-                    continue;
-                }
-                if (energyMatrix[k][row + 1] + distTo[getNum(col, row)] < distTo[getNum(k, row + 1)]) {
-                    distTo[getNum(k, row + 1)] = energyMatrix[k][row + 1] + distTo[getNum(col, row)];
-                    edgeTo[getNum(k, row + 1)] = getNum(col, row);
-                }
-            }
-        } else {
-            for (int k = row - 1; k <= row + 1; k++) {
-                if (k < 0 || k >= height) {
-                    continue;
-                }
-                if (energyMatrix[col + 1][k] + distTo[getNum(col, row)] < distTo[getNum(col + 1, k)]) {
-                    distTo[getNum(col + 1, k)] = energyMatrix[col + 1][k] + distTo[getNum(col, row)];
-                    edgeTo[getNum(col + 1, k)] = getNum(col, row);
-                }
+    private void relax(int i, int j) {
+        for (int k = j - 1; k <= j + 1; k++) {
+            if (energyMatrix[i + 1][k] + distTo[getNum(i, j)] < distTo[getNum(i + 1, k)]) {
+                distTo[getNum(i + 1, k)] = energyMatrix[i + 1][k] + distTo[getNum(i, j)];
+                edgeTo[getNum(i + 1, k)] = getNum(i, j);
             }
         }
     }
@@ -169,33 +130,26 @@ public class SeamCarver {
     public int[] findVerticalSeam() {
         int[] seam = new int[height];
 
-        for (int i = 0; i < height * width; i++) {
-            distTo[i] = Double.POSITIVE_INFINITY;
-        }
         for (int i = 0; i < width; i++) {
-            distTo[getNum(i, 0)] = 0;
-        }
-
-        for (int row = 0; row < height - 1; row++) {
-            for (int col = 0; col < width; col++) {
-                relax(col, row, false);
+            for (int j = 0; j < height; j++) {
+                relax(i, j);
             }
         }
         double minPathLength = Double.POSITIVE_INFINITY;
         int kValue = 0;
 
-        for (int col = 0; col < width; col++) {
-            if (distTo[getNum(col, height - 1)] < minPathLength) {
-                minPathLength = distTo[getNum(col, height - 1)];
-                kValue = col;
+        for (int k = 0; k < width; k++) {
+            if (edgeTo[getNum(height - 1, k)] < minPathLength) {
+                minPathLength = edgeTo[getNum(height - 1, k)];
+                kValue = k;
             }
         }
 
-        int seamPixel = getNum(kValue, height - 1);
+        int seamPixel = getNum(height - 1, kValue);
         int seamIndex = height - 1;
-        //int row;
+        int row;
 
-        while (seamIndex > 0) {
+        while (seamPixel > 0) {
             seam[seamIndex] = colFromNum(seamPixel);
             seamPixel = edgeTo[seamPixel];
             seamIndex--;
@@ -203,104 +157,6 @@ public class SeamCarver {
         }
 
         return seam;
-    }
-
-    public int[] findHorizontalSeam() {
-        int[] seam = new int[width];
-
-        for (int i = 0; i < height * width; i++) {
-            distTo[i] = Double.POSITIVE_INFINITY;
-        }
-        for (int i = 0; i < height; i++) {
-            distTo[getNum(0, i)] = 0;
-        }
-
-        for (int col = 0;
-                col < width - 1; col++) {
-            for (int row = 0; row < height; row++) {
-                relax(col, row, true);
-            }
-        }
-        double minPathLength = Double.POSITIVE_INFINITY;
-        int kValue = 0;
-
-        for (int row = 0;
-                row < height;
-                row++) {
-            if (distTo[getNum(width - 1, row)] < minPathLength) {
-                minPathLength = distTo[getNum(width - 1, row)];
-                kValue = row;
-            }
-        }
-
-        int seamPixel = getNum(width - 1, kValue);
-        int seamIndex = width - 1;
-        int row;
-
-        while (seamIndex
-                > 0) {
-            seam[seamIndex] = rowFromNum(seamPixel);
-            seamPixel = edgeTo[seamPixel];
-            seamIndex--;
-
-        }
-
-        return seam;
-    }
-
-    public void removeVerticalSeam(int[] seam) {
-        int[][] newPixelMatrix = new int[width - 1][height];
-        int[][] newEnergyMatrix = new int[width - 1][height];
-
-        for (int row = 0; row < height - 1; row++) {
-            for (int col = 0, ncol = 0; col < width; col++) {
-                if (col != seam[row]) {
-                    newPixelMatrix[ncol][row] = pixelMatrix[col][row];
-                    newEnergyMatrix[ncol][row] = energyMatrix[col][row];
-                    ncol++;
-                }
-            }
-        }
-
-        for (int row = 0; row < height; row++) {
-            for (int col = seam[row] - 1; col <= seam[row] + 1; col++) {
-                if (col >= 0 && col < width - 1) {
-                    newEnergyMatrix[col][row] = energy(col, row);
-                }
-            }
-        }
-
-        pixelMatrix = newPixelMatrix;
-        energyMatrix = newEnergyMatrix;
-        width--;
-    }
-
-    public void removeHorizontalSeam(int[] seam) {
-
-        int[][] newPixelMatrix = new int[width][height - 1];
-        int[][] newEnergyMatrix = new int[width][height - 1];
-
-        for (int col = 0; col < width; col++) {
-            for (int row = 0, nrow = 0; row < height; row++) {
-                if (row != seam[col]) {
-                    newPixelMatrix[col][nrow] = pixelMatrix[col][row];
-                    newEnergyMatrix[col][nrow] = energyMatrix[col][row];
-                    nrow++;
-                }
-            }
-        }
-
-        for (int col = 0; col < width; col++) {
-            for (int row = seam[col] - 1; row <= seam[col] + 1; row++) {
-                if (row >= 0 && row < height) {
-                    newEnergyMatrix[col][row] = energy(col, row);
-                }
-            }
-        }
-
-        pixelMatrix = newPixelMatrix;
-        height--;
-
     }
 
     public static void main(String[] args) {
